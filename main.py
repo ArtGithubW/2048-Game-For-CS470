@@ -3,7 +3,7 @@ import random
 from config import *
 import sys
 import keyboard as kb
-
+#from time import time #! Debugging time complexity for the implementation
 class Game(tk.Frame):
     def __init__(self):
         tk.Frame.__init__(self)
@@ -71,17 +71,17 @@ class Game(tk.Frame):
         key_event = kb.read_event()
         if key_event.event_type == kb.KEY_DOWN:
             if key_event.name == 'up':
-                self.up("")
+                self.up(None)
             elif key_event.name == 'down':
-                self.down("")
+                self.down(None)
             elif key_event.name == 'left':
-                self.left("")
+                self.left(None)
             elif key_event.name == 'right':
-                self.right("")
+                self.right(None)
             
 #! _________________________ INIT Game _________________________
     """
-        Inits the 4x4 Matrix full of 0s and randomly 
+        Inits the 4x4 Matrix full of 0s and randomly places 2 random cells with either a 2 or 4
     """
     def start_game(self) -> None:
         # create 2D 4x4 matrix of zeroes
@@ -91,17 +91,17 @@ class Game(tk.Frame):
             # fill 2 random cells with 2s
             row = random.randint(0, 3)
             col = random.randint(0, 3)
-            self.matrix[row][col] = 2
+            self.matrix[row][col] = random.choice([2, 4])    
             while(self.matrix[row][col] != 0):
                 row = random.randint(0, 3)
                 col = random.randint(0, 3)
-            self.matrix[row][col] = 2
+            self.matrix[row][col] = random.choice([2, 4])    
         else:
             self.matrix = [[0] * 4 for _ in range(4)]
             # fill 2 random cells with 2s
             row = random.randint(0, 3)
             col = random.randint(0, 3)
-            self.matrix[row][col] = 2
+            self.matrix[row][col] = random.choice([2, 4])    
             self.cells[row][col]["frame"].configure(bg=BLOCK_COLORS[2])
             self.cells[row][col]["number"].configure(
                 bg=BLOCK_COLORS[2],
@@ -111,7 +111,7 @@ class Game(tk.Frame):
             while(self.matrix[row][col] != 0):
                     row = random.randint(0, 3)
                     col = random.randint(0, 3)
-            self.matrix[row][col] = 2
+            self.matrix[row][col] = random.choice([2, 4])    
             self.cells[row][col]["frame"].configure(bg=BLOCK_COLORS[2])
             self.cells[row][col]["number"].configure(
                 bg=BLOCK_COLORS[2],
@@ -119,6 +119,8 @@ class Game(tk.Frame):
                 font=BLOCK_NUMBER_FONTS[2],
                 text="2")
         self.score = 0
+        for row in range(len(self.matrix)):
+            print(self.matrix[row])
 
 #! _________________________ Possible Move Checker _________________________
 
@@ -140,12 +142,15 @@ class Game(tk.Frame):
 #!_________________________ Random Tile Function _________________________
 
     def add_new_tile(self) -> None:
-        if all(element != 0 for row in self.matrix for element in row):
+        #* Checks for if no space is availiable for a new tile to spawn
+        if all(element != 0 for row in self.matrix for element in row): 
             print("NO SPACE")
             return None
+        
+        #* randomly selects a tile to spawn new tile. Will only spawn tile if tile empty -> (0)
         row = random.randint(0, 3)
         col = random.randint(0, 3)
-        while(self.matrix[row][col] != 0): #TODO: This can cause an infinite loop if there are no possible spaces left on board
+        while(self.matrix[row][col] != 0):
             row = random.randint(0, 3)
             col = random.randint(0, 3)
         self.matrix[row][col] = random.choice([2, 4])
@@ -184,6 +189,7 @@ class Game(tk.Frame):
     All functions below creates a False 4x4 matrix to merge the possible same integers on the called upon
     direction. If the int have been successfully merged then the bool at the cell turns True.
     
+    Parameters can be None because of TKinter's way of calling master bind function 
     Also checks if game is over first to prevent edge cases
     """
     def left(self,event:None):
@@ -277,7 +283,8 @@ class Game(tk.Frame):
 
 #! _________________________  Result _________________________
     """
-    This destroys the window if user achieves 2048 in ANY of the cells or there is no valid move availiable
+    This destroys the window if user achieves 2048 in ANY of the cells 
+    OR there is no valid move availiable
     """
     def game_over(self) -> None:
         if self.HEADLESS:
@@ -287,7 +294,7 @@ class Game(tk.Frame):
             elif not any(0 in row for row in self.matrix) and not self.horizontal_move_exists() and not self.vertical_move_exists():
                 print("Lose")
                 sys.exit()
-            else:
+            else:  #! Delete this in implementation
                 print("Debug")
         else:
             if any(2048 in row for row in self.matrix):
@@ -297,7 +304,7 @@ class Game(tk.Frame):
                 print("Lose")
                 self.master.destroy()
 
-            else:
+            else: #! Delete this in implementation
                 print("Debug")
         
             

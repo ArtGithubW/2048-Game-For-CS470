@@ -11,3 +11,7 @@ Uses keyboard arrow keys for users to interact
 ### Dependencies
 
 `pip install -r requirements.txt`
+
+### Notes:
+
+- Time taken for each movement operation is ~0.004 seconds at O(1) complexity

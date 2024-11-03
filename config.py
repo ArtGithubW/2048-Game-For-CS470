@@ -1,4 +1,4 @@
-HEADLESS = True
+HEADLESS = False
 
 GRID_COLOR = "#a39489"
 EMPTY_COLOR = "#c2b3a9"
