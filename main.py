@@ -3,17 +3,21 @@ import random
 from config import *
 import sys
 import keyboard as kb
-#from time import time #! Debugging time complexity for the implementation
+import neat
+import os
+
 class Game(tk.Frame):
-    def __init__(self):
+    def __init__(self, INIT_HEADLESS=None, INIT_TRAINING=None):
         tk.Frame.__init__(self)
         
-        self.HEADLESS = HEADLESS
+        self.HEADLESS = HEADLESS if INIT_HEADLESS is None else INIT_HEADLESS
+        self.TRAINING = TRAINING if INIT_TRAINING is None else INIT_TRAINING
         
         if self.HEADLESS:
             self.start_game()
-            while True:
-                self.on_arrow_key()
+            if not TRAINING:
+                while True:
+                    self.on_arrow_key()
                 
         else:
             self.grid()
@@ -119,8 +123,9 @@ class Game(tk.Frame):
                 font=BLOCK_NUMBER_FONTS[2],
                 text="2")
         self.score = 0
-        for row in range(len(self.matrix)):
-            print(self.matrix[row])
+        if not self.TRAINING:
+            for row in range(len(self.matrix)):
+                print(self.matrix[row])
 
 #! _________________________ Possible Move Checker _________________________
 
@@ -143,8 +148,9 @@ class Game(tk.Frame):
 
     def add_new_tile(self) -> None:
         #* Checks for if no space is availiable for a new tile to spawn
-        if all(element != 0 for row in self.matrix for element in row): 
-            print("NO SPACE")
+        if all(element != 0 for row in self.matrix for element in row):
+            if not TRAINING:
+                print("NO SPACE")
             return None
         
         #* randomly selects a tile to spawn new tile. Will only spawn tile if tile empty -> (0)
@@ -160,8 +166,11 @@ class Game(tk.Frame):
 
     def update_GUI(self) -> None:
         if self.HEADLESS:
-            for row in range(len(self.matrix)):
-                print(self.matrix[row])
+            if not self.TRAINING:
+                print("===============")
+                for row in range(len(self.matrix)):
+                    print(self.matrix[row])
+                print("===============")
         else:
             for i in range(len(self.matrix)):
                 for j in range(len(self.matrix[0])):
@@ -284,34 +293,137 @@ class Game(tk.Frame):
 #! _________________________  Result _________________________
     """
     This destroys the window if user achieves 2048 in ANY of the cells 
-    OR there is no valid move availiable
+    OR there is no valid move available
     """
-    def game_over(self) -> None:
-        if self.HEADLESS:
-            if any(2048 in row for row in self.matrix):
-                print("Win")
-                sys.exit()
-            elif not any(0 in row for row in self.matrix) and not self.horizontal_move_exists() and not self.vertical_move_exists():
-                print("Lose")
-                sys.exit()
-            else:  #! Delete this in implementation
-                print("Debug")
+    def game_over(self) -> bool:
+        is_game_over = False
+        if any(2048 in row for row in self.matrix):
+            # print("Win")
+            # sys.exit()
+            if not self.HEADLESS:
+                self.master.destroy()
+            is_game_over = True
+        elif not any(0 in row for row in self.matrix) and not self.horizontal_move_exists() and not self.vertical_move_exists():
+            # print("Lose")
+            # sys.exit()
+            if not self.HEADLESS:
+                self.master.destroy()
+            is_game_over = True
+        return is_game_over
+
+    def flatten_board_to_list(self) -> list:
+        return [element for row in self.matrix for element in row]
+
+    def get_highest_tile(self) -> int:
+        return max(max(row) for row in self.matrix)
+
+
+def eval_genome(genomes, config):
+    neural_nets = []
+    for _, genome in genomes:
+        genome.fitness = 0
+        net = neat.nn.FeedForwardNetwork.create(genome, config)
+        neural_nets.append((net, genome))
+
+    for net, genome in neural_nets:
+        game = Game()
+        moves_stuck = 0
+        prev_score = 0
+        seen_states = list()
+        while not game.game_over():
+            inputs = game.flatten_board_to_list()
+            output = net.activate(inputs)
+            move = output.index(max(output))
+            # Make a move
+            if move == 0:
+                game.left(None)
+            elif move == 1:
+                game.right(None)
+            elif move == 2:
+                game.up(None)
+            elif move == 3:
+                game.down(None)
+            # Don't let the game get stuck
+            if game.score == prev_score:
+                moves_stuck += 1
+            else:
+                moves_stuck = 0
+            if moves_stuck > 10:
+                # We HATE getting stuck
+                # genome.fitness *= 0.2
+                break
+            # Reward the genome for increasing the score
+            if game.score > prev_score:
+                genome.fitness += 100
+            # else:
+            #     genome.fitness -= 1
+            prev_score = game.score
+            # Penalize the genome for repeating the same states
+            # if game.flatten_board_to_list() in seen_states:
+            #     genome.fitness += -10
+            # if game.flatten_board_to_list() not in seen_states:
+            #     seen_states.append(game.flatten_board_to_list())
+
+        # Reward for finishing nicely
+        # if game.game_over():
+        #     genome.fitness += 100
+    return genome.fitness
+
+def run_neat(config_file):
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                                neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                                config_file)
+    p = neat.Population(config)
+    p.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    p.add_reporter(stats)
+
+    winner = p.run(eval_genome, 1000)
+    return winner
+
+def play_with_winner(winner, config_file):
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                                neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                                config_file)
+    net = neat.nn.FeedForwardNetwork.create(winner, config)
+
+    game = Game(INIT_HEADLESS=True, INIT_TRAINING=False)
+
+    print("Playing with winner")
+    previous_score = 0
+    moves_without_score_increase = 0
+    while not game.game_over():
+        inputs = game.flatten_board_to_list()
+        output = net.activate(inputs)
+        move = output.index(max(output))
+        if move == 0:
+            game.left(None)
+        elif move == 1:
+            game.right(None)
+        elif move == 2:
+            game.up(None)
+        elif move == 3:
+            game.down(None)
+        # game.update_GUI()
+        # Don't get stuck
+        if game.score == previous_score:
+            moves_without_score_increase += 1
         else:
-            if any(2048 in row for row in self.matrix):
-                print("Win")
-                self.master.destroy()
-            elif not any(0 in row for row in self.matrix) and not self.horizontal_move_exists() and not self.vertical_move_exists():
-                print("Lose")
-                self.master.destroy()
+            moves_without_score_increase = 0
+        if moves_without_score_increase > 10:
+            print("Stuck")
+            break
+        previous_score = game.score
 
-            else: #! Delete this in implementation
-                print("Debug")
-        
-            
-
-def main():
-    Game()
-
+    # game.update_GUI()
+    print(f"Score: {game.score}")
+    print(f"Highest Tile: {game.get_highest_tile()}")
 
 if __name__ == "__main__":
-    main()
+    if not TRAINING:
+        Game()
+    else:
+        config_file = "./neat_config"
+        winner = run_neat(config_file)
+        # print(winner)
+        play_with_winner(winner, config_file)
