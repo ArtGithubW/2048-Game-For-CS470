@@ -1,15 +1,12 @@
 import tkinter as tk
 import random
 from config import *
-import sys
 import keyboard as kb
 import neat
-import os
 
 class Game(tk.Frame):
     def __init__(self, INIT_HEADLESS=None, INIT_TRAINING=None):
-        tk.Frame.__init__(self)
-        
+
         self.HEADLESS = HEADLESS if INIT_HEADLESS is None else INIT_HEADLESS
         self.TRAINING = TRAINING if INIT_TRAINING is None else INIT_TRAINING
         
@@ -20,6 +17,7 @@ class Game(tk.Frame):
                     self.on_arrow_key()
                 
         else:
+            tk.Frame.__init__(self)
             self.grid()
             self.master.title('Gaming Gamer Gaming Games')
 
@@ -419,11 +417,11 @@ def play_with_winner(winner, config_file):
     print(f"Score: {game.score}")
     print(f"Highest Tile: {game.get_highest_tile()}")
 
-if __name__ == "__main__":
-    if not TRAINING:
-        Game()
-    else:
-        config_file = "./neat_config"
-        winner = run_neat(config_file)
-        # print(winner)
-        play_with_winner(winner, config_file)
+# Run even when imported (For Google Colab)
+if not TRAINING:
+    Game()
+else:
+    config_file = "./neat_config"
+    winner = run_neat(config_file)
+    # print(winner)
+    play_with_winner(winner, config_file)
