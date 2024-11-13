@@ -14,4 +14,4 @@ Uses keyboard arrow keys for users to interact
 
 ### Notes:
 
-- Time taken for each movement operation is ~0.004 seconds at O(1) complexity
+- Time taken for each movement operation is ~0.001 seconds at O(1) complexity

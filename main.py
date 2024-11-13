@@ -1,9 +1,10 @@
 import tkinter as tk
 import random
+import numpy as np
 from config import *
 import sys
 import keyboard as kb
-#from time import time #! Debugging time complexity for the implementation
+from time import time #! Debugging time complexity for the implementation
 class Game(tk.Frame):
     def __init__(self):
         tk.Frame.__init__(self)
@@ -24,8 +25,6 @@ class Game(tk.Frame):
             self.main_grid.grid(pady=(80, 0))
             self.Init_GUI(self.HEADLESS)
 
-
-
             self.master.bind("<Left>", self.left)
             self.master.bind("<Right>", self.right)
             self.master.bind("<Up>", self.up)
@@ -34,10 +33,8 @@ class Game(tk.Frame):
 
             self.mainloop()
         
-    def Init_GUI(self,Headless) -> None:
-        if Headless:
-            pass
-        else:
+    def Init_GUI(self, Headless) -> None:
+        if not Headless:
             self.cells = []
             for i in range(4):
                 row = []
@@ -85,39 +82,27 @@ class Game(tk.Frame):
     """
     def start_game(self) -> None:
         # create 2D 4x4 matrix of zeroes
-        if self.HEADLESS:
-            self.matrix = [[0] * 4 for _ in range(4)]
+        self.matrix = np.zeros((4, 4), dtype=int)
 
-            # fill 2 random cells with 2s
-            row = random.randint(0, 3)
-            col = random.randint(0, 3)
-            self.matrix[row][col] = random.choice([2, 4])    
-            while(self.matrix[row][col] != 0):
-                row = random.randint(0, 3)
-                col = random.randint(0, 3)
-            self.matrix[row][col] = random.choice([2, 4])    
-        else:
-            self.matrix = [[0] * 4 for _ in range(4)]
-            # fill 2 random cells with 2s
-            row = random.randint(0, 3)
-            col = random.randint(0, 3)
-            self.matrix[row][col] = random.choice([2, 4])    
-            self.cells[row][col]["frame"].configure(bg=BLOCK_COLORS[2])
-            self.cells[row][col]["number"].configure(
-                bg=BLOCK_COLORS[2],
-                fg=BLOCK_NUM_COLORS[2],
-                font=BLOCK_NUMBER_FONTS[2],
-                text="2")
-            while(self.matrix[row][col] != 0):
-                    row = random.randint(0, 3)
-                    col = random.randint(0, 3)
-            self.matrix[row][col] = random.choice([2, 4])    
-            self.cells[row][col]["frame"].configure(bg=BLOCK_COLORS[2])
-            self.cells[row][col]["number"].configure(
-                bg=BLOCK_COLORS[2],
-                fg=BLOCK_NUM_COLORS[2],
-                font=BLOCK_NUMBER_FONTS[2],
-                text="2")
+        # fill 2 random cells with 2s
+        for _ in range(2):
+            row, col = np.random.randint(0, 4, size=2)
+            while self.matrix[row, col] != 0:
+                row, col = np.random.randint(0, 4, size=2)
+            self.matrix[row, col] = np.random.choice([2, 4])
+
+        if not self.HEADLESS:
+            for row in range(4):
+                for col in range(4):
+                    value = self.matrix[row, col]
+                    if value != 0:
+                        color = BLOCK_COLORS[value]
+                        self.cells[row][col]["frame"].configure(bg=color)
+                        self.cells[row][col]["number"].configure(
+                            bg=color,
+                            fg=BLOCK_NUM_COLORS[value],
+                            font=BLOCK_NUMBER_FONTS[value],
+                            text=str(value))
         self.score = 0
         for row in range(len(self.matrix)):
             print(self.matrix[row])
@@ -125,36 +110,24 @@ class Game(tk.Frame):
 #! _________________________ Possible Move Checker _________________________
 
     def horizontal_move_exists(self) -> bool:
-        for i in range(4):
-            for j in range(3):
-                if self.matrix[i][j] == self.matrix[i][j + 1]:
-                    return True
-        return False
-
+        return np.any(self.matrix[:, :-1] == self.matrix[:, 1:])
 
     def vertical_move_exists(self) -> bool:
-        for i in range(3):
-            for j in range(4):
-                if self.matrix[i][j] == self.matrix[i + 1][j]:
-                    return True
-        return False
+        return np.any(self.matrix[:-1, :] == self.matrix[1:, :])
 
 #!_________________________ Random Tile Function _________________________
 
     def add_new_tile(self) -> None:
         #* Checks for if no space is availiable for a new tile to spawn
-        if all(element != 0 for row in self.matrix for element in row): 
+        if not np.any(self.matrix == 0):
             print("NO SPACE")
             return None
         
         #* randomly selects a tile to spawn new tile. Will only spawn tile if tile empty -> (0)
-        row = random.randint(0, 3)
-        col = random.randint(0, 3)
-        while(self.matrix[row][col] != 0):
-            row = random.randint(0, 3)
-            col = random.randint(0, 3)
-        self.matrix[row][col] = random.choice([2, 4])
-
+        row, col = np.random.randint(0, 4, size=2)
+        while self.matrix[row, col] != 0:
+            row, col = np.random.randint(0, 4, size=2)
+        self.matrix[row, col] = np.random.choice([2, 4])
 
 #!_________________________ Update the GUI to match the matrix _________________________
 
@@ -163,9 +136,9 @@ class Game(tk.Frame):
             for row in range(len(self.matrix)):
                 print(self.matrix[row])
         else:
-            for i in range(len(self.matrix)):
-                for j in range(len(self.matrix[0])):
-                    cell_value = self.matrix[i][j]
+            for i in range(4):
+                for j in range(4):
+                    cell_value = self.matrix[i, j]
                     if cell_value == 0:
                         self.cells[i][j]["frame"].configure(bg=EMPTY_COLOR)
                         self.cells[i][j]["number"].configure(
@@ -181,7 +154,6 @@ class Game(tk.Frame):
             self.score_label.configure(text=self.score)
             self.update_idletasks()
 
-
 #! _________________________ Arrow-Press and Matrix Manipulation Code_________________________
 #* Suddenly I want brisket
 
@@ -191,95 +163,58 @@ class Game(tk.Frame):
     
     Parameters can be None because of TKinter's way of calling master bind function 
     Also checks if game is over first to prevent edge cases
-    """
-    def left(self,event:None):
+    """ 
+    def left(self, event=None) -> None:
         self.game_over()
-        merged = [[False for _ in range(4)] for _ in range(4)]
-        for i in range(len(self.matrix)):
-            for j in range(len(self.matrix[0])):
-                shift = 0
-                for q in range(j):
-                    if self.matrix[i][q] == 0:
-                        shift += 1
-                if shift > 0:
-                    self.matrix[i][j - shift] = self.matrix[i][j]
-                    self.matrix[i][j] = 0
-                if self.matrix[i][j - shift] == self.matrix[i][j - shift - 1] and not merged[i][j - shift - 1] \
-                        and not merged[i][j - shift]:
-                    self.matrix[i][j - shift - 1] *= 2
-                    self.score += self.matrix[i][j - shift - 1]
-                    self.matrix[i][j - shift] = 0
-                    merged[i][j - shift - 1] = True
-        self.add_new_tile()
-        self.update_GUI()
+        pre_matrix = self.matrix.copy() 
+        for i in range(4):
+            self.matrix[i] = self.merge_line(self.matrix[i])
+        if not np.array_equal(self.matrix, pre_matrix):  #! This is Brute force checking if a valid move was made or not but ¯\_(ツ)_/¯
+            self.add_new_tile()
+            self.update_GUI()
 
-
-    def right(self, event:None):
+    def right(self, event=None) -> None:
         self.game_over()
-        merged = [[False for _ in range(4)] for _ in range(4)]
-        for i in range(len(self.matrix)):
-            for j in range(len(self.matrix[0])):
-                shift = 0
-                for q in range(j):
-                    if self.matrix[i][3 - q] == 0:
-                        shift += 1
-                if shift > 0:
-                    self.matrix[i][3 - j + shift] = self.matrix[i][3 - j]
-                    self.matrix[i][3 - j] = 0
-                if 4 - j + shift <= 3:
-                    if self.matrix[i][4 - j + shift] == self.matrix[i][3 - j + shift] and not merged[i][4 - j + shift] \
-                            and not merged[i][3 - j + shift]:
-                        self.matrix[i][4 - j + shift] *= 2
-                        self.score += self.matrix[i][4 - j + shift]
-                        self.matrix[i][3 - j + shift] = 0
-                        merged[i][4 - j + shift] = True
-        self.add_new_tile()                
-        self.update_GUI()
+        pre_matrix = self.matrix.copy() 
+        for i in range(4):
+            self.matrix[i] = np.flip(self.merge_line(np.flip(self.matrix[i])))
+        if not np.array_equal(self.matrix, pre_matrix):  #! This is Brute force checking if a valid move was made or not but ¯\_(ツ)_/¯
+            self.add_new_tile()
+            self.update_GUI()
 
-    def up(self, event:None):
+    def up(self, event=None) -> None:
         self.game_over()
-        merged = [[False for _ in range(4)] for _ in range(4)]
-        for i in range(len(self.matrix)):
-            for j in range(len(self.matrix[0])):
-                shift = 0
-                if i > 0:
-                    for q in range(i):
-                        if self.matrix[q][j] == 0:
-                            shift += 1
-                    if shift > 0:
-                        self.matrix[i - shift][j] = self.matrix[i][j]
-                        self.matrix[i][j] = 0
-                    if self.matrix[i - shift - 1][j] == self.matrix[i - shift][j] and not merged[i - shift][j] \
-                            and not merged[i - shift - 1][j]:
-                        self.matrix[i - shift - 1][j] *= 2
-                        self.score += self.matrix[i - shift - 1][j]
-                        self.matrix[i - shift][j] = 0
-                        merged[i - shift - 1][j] = True
-        self.add_new_tile()                
-        self.update_GUI()
+        pre_matrix = self.matrix.copy() 
+        for j in range(4):
+            self.matrix[:, j] = self.merge_line(self.matrix[:, j])
+        if not np.array_equal(self.matrix, pre_matrix):  #! This is Brute force checking if a valid move was made or not but ¯\_(ツ)_/¯
+            self.add_new_tile()
+            self.update_GUI()
 
-    def down(self,event:None):
+    def down(self, event=None) -> None:
         self.game_over()
-        merged = [[False for _ in range(4)] for _ in range(4)]
-        for i in range(3):
-            for j in range(4):
-                shift = 0
-                for q in range(i + 1):
-                    if self.matrix[3 - q][j] == 0:
-                        shift += 1
-                if shift > 0:
-                    self.matrix[2 - i + shift][j] = self.matrix[2 - i][j]
-                    self.matrix[2 - i][j] = 0
-                if 3 - i + shift <= 3:
-                    if self.matrix[2 - i + shift][j] == self.matrix[3 - i + shift][j] and not merged[3 - i + shift][j] \
-                            and not merged[2 - i + shift][j]:
-                        self.matrix[3 - i + shift][j] *= 2
-                        self.score += self.matrix[3 - i + shift][j]
-                        self.matrix[2 - i + shift][j] = 0
-                        merged[3 - i + shift][j] = True
-        self.add_new_tile()
-        self.update_GUI()
+        pre_matrix = self.matrix.copy() 
+        for j in range(4):
+            self.matrix[:, j] = np.flip(self.merge_line(np.flip(self.matrix[:, j])))
+        if not np.array_equal(self.matrix, pre_matrix):  #! This is Brute force checking if a valid move was made or not but ¯\_(ツ)_/¯
+            self.add_new_tile()
+            self.update_GUI()
 
+    def merge_line(self, line):
+        merged = np.zeros(4, dtype=int)
+        idx = 0
+        for i in range(4):
+            if line[i] != 0:
+                if merged[idx] == line[i]:
+                    merged[idx] *= 2
+                    self.score += merged[idx]
+                    idx += 1
+                elif merged[idx] == 0:
+                    merged[idx] = line[i]
+                else:
+                    idx += 1
+                    merged[idx] = line[i]
+        return merged
 
 #! _________________________  Result _________________________
     """
@@ -288,30 +223,26 @@ class Game(tk.Frame):
     """
     def game_over(self) -> None:
         if self.HEADLESS:
-            if any(2048 in row for row in self.matrix):
+            if np.any(self.matrix == 2048):
                 print("Win")
                 sys.exit()
-            elif not any(0 in row for row in self.matrix) and not self.horizontal_move_exists() and not self.vertical_move_exists():
+            elif not np.any(self.matrix == 0) and not self.horizontal_move_exists() and not self.vertical_move_exists():
                 print("Lose")
                 sys.exit()
             else:  #! Delete this in implementation
                 print("Debug")
         else:
-            if any(2048 in row for row in self.matrix):
+            if np.any(self.matrix == 2048):
                 print("Win")
                 self.master.destroy()
-            elif not any(0 in row for row in self.matrix) and not self.horizontal_move_exists() and not self.vertical_move_exists():
+            elif not np.any(self.matrix == 0) and not self.horizontal_move_exists() and not self.vertical_move_exists():
                 print("Lose")
                 self.master.destroy()
-
             else: #! Delete this in implementation
                 print("Debug")
         
-            
-
 def main():
     Game()
-
 
 if __name__ == "__main__":
     main()
