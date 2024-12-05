@@ -275,15 +275,20 @@ def eval_genome(genome, config):
         # Don't let the game get stuck
         if game.score == prev_score:
             moves_stuck += 1
-            genome.fitness -= 50
+            #genome.fitness -= 50
         else:
             moves_stuck = 0
-        if moves_stuck > 10:
+        if game.score < prev_score:
+            genome.fitness -= 50
+        if moves_stuck > 3:
             #genome.fitness -= 50
+            pass
+        if moves_stuck > 10:
+            genome.fitness -= 50
             break
         # Reward the genome for increasing the score
         if game.score > prev_score:
-            genome.fitness += 100
+            genome.fitness += 200
         prev_score = game.score
 
     return genome.fitness
@@ -352,7 +357,7 @@ if __name__ == "__main__":
     if not TRAINING:
         Game()
     else:
-        config_file = "./neat_config"
+        config_file = "C:/Users/zak/OneDrive/Desktop/CS470/2048-Game-For-CS470/neat_config"
         winner = run_neat(config_file)
         # print(winner)
         play_with_winner(winner, config_file)
