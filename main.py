@@ -1,10 +1,8 @@
 import tkinter as tk
-import random
 import numpy as np
 from config import *
-import sys
+import pickle
 import keyboard as kb
-from time import time #! Debugging time complexity for the implementation
 import neat
 from neat.parallel import ParallelEvaluator
 import multiprocessing
@@ -13,9 +11,6 @@ class Game(tk.Frame):
     def __init__(self, INIT_HEADLESS=None, INIT_TRAINING=None):
         self.HEADLESS = HEADLESS if INIT_HEADLESS is None else INIT_HEADLESS
         self.TRAINING = TRAINING if INIT_TRAINING is None else INIT_TRAINING
-        
-        #tk.Frame.__init__(self)
-        #self.HEADLESS = HEADLESS
         
         if self.HEADLESS:
             self.start_game()
@@ -113,8 +108,8 @@ class Game(tk.Frame):
                             text=str(value))
         self.score = 0
         for row in range(len(self.matrix)):
-            #print(self.matrix[row])
-            pass
+            if not self.TRAINING:
+                print(self.matrix[row])
 
 #! _________________________ Possible Move Checker _________________________
 
@@ -143,8 +138,8 @@ class Game(tk.Frame):
     def update_GUI(self) -> None:
         if self.HEADLESS:
             for row in range(len(self.matrix)):
-               # print(self.matrix[row])
-                pass
+                if not self.TRAINING:
+                    print(self.matrix[row])
         else:
             for i in range(4):
                 for j in range(4):
@@ -258,41 +253,42 @@ def eval_genome(genome, config):
     game = Game(INIT_HEADLESS=True, INIT_TRAINING=True)
     moves_stuck = 0
     prev_score = 0
-    seen_states = list()
     while not game.game_over():
         inputs = game.flatten_board_to_list()
         output = net.activate(inputs)
-        move = output.index(max(output))
-        # Make a move
-        if move == 0:
-            game.left(None)
-        elif move == 1:
-            game.right(None)
-        elif move == 2:
-            game.up(None)
-        elif move == 3:
-            game.down(None)
-        # Don't let the game get stuck
-        if game.score == prev_score:
-            moves_stuck += 1
-            #genome.fitness -= 50
-        else:
-            moves_stuck = 0
-        if game.score < prev_score:
-            genome.fitness -= 50
-        if moves_stuck > 3:
-            #genome.fitness -= 50
-            pass
-        if moves_stuck > 10:
-            genome.fitness -= 50
-            break
+        # move = output.index(max(output))
+        output.sort()
+        for possible_move in output:
+            move = output.index(possible_move)
+            # Make a move
+            if move == 0:
+                game.left(None)
+            elif move == 1:
+                game.right(None)
+            elif move == 2:
+                game.up(None)
+            elif move == 3:
+                game.down(None)
+            if game.score > prev_score:
+                genome.fitness += 100
+                prev_score = game.score
+                break
+            # genome.fitness -
+            # Don't let the game get stuck
+            # if game.score == prev_score:
+            #     moves_stuck += 1
+            #     genome.fitness -= 10
+            # else:
+            #     moves_stuck = 0
+            # if moves_stuck > 10:
+            #     genome.fitness -= 50
+            #     break
         # Reward the genome for increasing the score
-        if game.score > prev_score:
-            genome.fitness += 200
-        prev_score = game.score
-
+        # if game.score > prev_score:
+        #     genome.fitness += 100
+        # prev_score = game.score
+    print(f"Highest Tile: {game.get_highest_tile()}")
     return genome.fitness
-    #return fitness
 
 def run_neat(config_file):
     config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
@@ -304,13 +300,11 @@ def run_neat(config_file):
     p.add_reporter(stats)
 
     # Use ParallelEvaluator to evaluate genomes in parallel
-    #parallel_evaluator = ParallelEvaluator(multiprocessing.cpu_count(), eval_genome)
     num_workers = multiprocessing.cpu_count()
-    #num_workers = 8
-    timeout = 300  # seconds
+    timeout = 300 # seconds
     parallel_evaluator = ParallelEvaluator(num_workers, eval_genome, timeout=timeout)
     print(f"Training with {num_workers} workers in the pool.")
-    
+
     winner = p.run(parallel_evaluator.evaluate, 1000)
     return winner
 
@@ -359,5 +353,7 @@ if __name__ == "__main__":
     else:
         config_file = "./neat_config"
         winner = run_neat(config_file)
-        # print(winner)
+        # Save winner
+        with open("winner.pkl", "wb") as f:
+            pickle.dump(winner, f)
         play_with_winner(winner, config_file)
