@@ -5,18 +5,26 @@ from config import *
 import sys
 import keyboard as kb
 from time import time #! Debugging time complexity for the implementation
+import neat
+from neat.parallel import ParallelEvaluator
+import multiprocessing
+
 class Game(tk.Frame):
-    def __init__(self):
-        tk.Frame.__init__(self)
+    def __init__(self, INIT_HEADLESS=None, INIT_TRAINING=None):
+        self.HEADLESS = HEADLESS if INIT_HEADLESS is None else INIT_HEADLESS
+        self.TRAINING = TRAINING if INIT_TRAINING is None else INIT_TRAINING
         
-        self.HEADLESS = HEADLESS
+        #tk.Frame.__init__(self)
+        #self.HEADLESS = HEADLESS
         
         if self.HEADLESS:
             self.start_game()
-            while True:
-                self.on_arrow_key()
+            if not TRAINING:
+                while True:
+                    self.on_arrow_key()
                 
         else:
+            tk.Frame.__init__(self)
             self.grid()
             self.master.title('Gaming Gamer Gaming Games')
 
@@ -69,7 +77,7 @@ class Game(tk.Frame):
         if key_event.event_type == kb.KEY_DOWN:
             if key_event.name == 'up':
                 self.up(None)
-            elif key_event.name == 'down':
+            elif key_event.name == 'down': 
                 self.down(None)
             elif key_event.name == 'left':
                 self.left(None)
@@ -105,7 +113,8 @@ class Game(tk.Frame):
                             text=str(value))
         self.score = 0
         for row in range(len(self.matrix)):
-            print(self.matrix[row])
+            #print(self.matrix[row])
+            pass
 
 #! _________________________ Possible Move Checker _________________________
 
@@ -134,7 +143,8 @@ class Game(tk.Frame):
     def update_GUI(self) -> None:
         if self.HEADLESS:
             for row in range(len(self.matrix)):
-                print(self.matrix[row])
+               # print(self.matrix[row])
+                pass
         else:
             for i in range(4):
                 for j in range(4):
@@ -221,28 +231,133 @@ class Game(tk.Frame):
     This destroys the window if user achieves 2048 in ANY of the cells 
     OR there is no valid move availiable
     """
-    def game_over(self) -> None:
-        if self.HEADLESS:
-            if np.any(self.matrix == 2048):
-                print("Win")
-                sys.exit()
-            elif not np.any(self.matrix == 0) and not self.horizontal_move_exists() and not self.vertical_move_exists():
-                print("Lose")
-                sys.exit()
-            else:  #! Delete this in implementation
-                print("Debug")
+    def game_over(self) -> bool:
+        is_game_over = False
+        if np.any(self.matrix == 2048):
+            #print("WIN")
+            if not self.HEADLESS:
+                self.destroy_window()
+            is_game_over = True
+        elif not np.any(self.matrix == 0) and not self.horizontal_move_exists() and not self.vertical_move_exists():
+            #print("LOSE")
+            if not self.HEADLESS:
+                self.destroy_window()
+            is_game_over = True
+        return is_game_over
+
+    def flatten_board_to_list(self) -> list:
+        return [element for row in self.matrix for element in row]
+
+    def get_highest_tile(self) -> int:
+        return max(max(row) for row in self.matrix)    
+
+def eval_genome(genome, config):
+    genome.fitness = 0
+    net = neat.nn.FeedForwardNetwork.create(genome, config)
+
+    game = Game(INIT_HEADLESS=True, INIT_TRAINING=True)
+    moves_stuck = 0
+    prev_score = 0
+    seen_states = list()
+    while not game.game_over():
+        inputs = game.flatten_board_to_list()
+        output = net.activate(inputs)
+        move = output.index(max(output))
+        # Make a move
+        if move == 0:
+            game.left(None)
+        elif move == 1:
+            game.right(None)
+        elif move == 2:
+            game.up(None)
+        elif move == 3:
+            game.down(None)
+        # Don't let the game get stuck
+        if game.score == prev_score:
+            moves_stuck += 1
+            #genome.fitness -= 50
         else:
-            if np.any(self.matrix == 2048):
-                print("Win")
-                self.master.destroy()
-            elif not np.any(self.matrix == 0) and not self.horizontal_move_exists() and not self.vertical_move_exists():
-                print("Lose")
-                self.master.destroy()
-            else: #! Delete this in implementation
-                print("Debug")
-        
-def main():
-    Game()
+            moves_stuck = 0
+        if game.score < prev_score:
+            genome.fitness -= 50
+        if moves_stuck > 3:
+            #genome.fitness -= 50
+            pass
+        if moves_stuck > 10:
+            genome.fitness -= 50
+            break
+        # Reward the genome for increasing the score
+        if game.score > prev_score:
+            genome.fitness += 200
+        prev_score = game.score
+
+    return genome.fitness
+    #return fitness
+
+def run_neat(config_file):
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                                neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                                config_file)
+    p = neat.Population(config)
+    p.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    p.add_reporter(stats)
+
+    # Use ParallelEvaluator to evaluate genomes in parallel
+    #parallel_evaluator = ParallelEvaluator(multiprocessing.cpu_count(), eval_genome)
+    num_workers = multiprocessing.cpu_count()
+    #num_workers = 8
+    timeout = 300  # seconds
+    parallel_evaluator = ParallelEvaluator(num_workers, eval_genome, timeout=timeout)
+    print(f"Training with {num_workers} workers in the pool.")
+    
+    winner = p.run(parallel_evaluator.evaluate, 1000)
+    return winner
+
+
+def play_with_winner(winner, config_file):
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                                neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                                config_file)
+    net = neat.nn.FeedForwardNetwork.create(winner, config)
+
+    game = Game(INIT_HEADLESS=True, INIT_TRAINING=False)
+
+    print("Playing with winner")
+    previous_score = 0
+    moves_without_score_increase = 0
+    while not game.game_over():
+       inputs = game.flatten_board_to_list()
+       output = net.activate(inputs)
+       move = output.index(max(output))
+       if move == 0:
+            game.left(None)
+       elif move == 1:
+            game.right(None)
+       elif move == 2:
+            game.up(None)
+       elif move == 3:
+            game.down(None)
+        # game.update_GUI()
+        # Don't get stuck
+       if game.score == previous_score:
+            moves_without_score_increase += 1
+       else:
+            moves_without_score_increase = 0
+       if moves_without_score_increase > 10:
+            print("Stuck")
+            break
+       previous_score = game.score
+
+    # game.update_GUI()
+    print(f"Score: {game.score}")
+    print(f"Highest Tile: {game.get_highest_tile()}")
 
 if __name__ == "__main__":
-    main()
+    if not TRAINING:
+        Game()
+    else:
+        config_file = "C:/Users/zak/OneDrive/Desktop/CS470/2048-Game-For-CS470/neat_config"
+        winner = run_neat(config_file)
+        # print(winner)
+        play_with_winner(winner, config_file)
