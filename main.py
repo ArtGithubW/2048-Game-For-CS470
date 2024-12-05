@@ -6,7 +6,7 @@ import keyboard as kb
 import neat
 from neat.parallel import ParallelEvaluator
 import multiprocessing
-
+import time
 class Game(tk.Frame):
     def __init__(self, INIT_HEADLESS=None, INIT_TRAINING=None):
         self.HEADLESS = HEADLESS if INIT_HEADLESS is None else INIT_HEADLESS
@@ -283,6 +283,8 @@ def eval_genome(genome, config):
 
 
         prev_score = game.score
+    print(f"Score: {game.score}")
+    print(f"Highest: {game.get_highest_tile()}")
     return genome.fitness
 
 def run_neat(config_file):
@@ -318,25 +320,27 @@ def play_with_winner(winner, config_file):
     while not game.game_over():
        inputs = game.flatten_board_to_list()
        output = net.activate(inputs)
-       move = output.index(max(output))
-       if move == 0:
-            game.left(None)
-       elif move == 1:
-            game.right(None)
-       elif move == 2:
-            game.up(None)
-       elif move == 3:
-            game.down(None)
+       sorted_indices = sorted(range(len(output)), key=lambda i: output[i], reverse=True)
+       for move in sorted_indices:
+        if move == 0:
+             game.left(None)
+        elif move == 1:
+             game.right(None)
+        elif move == 2:
+             game.up(None)
+        elif move == 3:
+             game.down(None)
         # game.update_GUI()
         # Don't get stuck
-       if game.score == previous_score:
-            moves_without_score_increase += 1
-       else:
+        if game.score == previous_score:
+             moves_without_score_increase += 1
+        else:
             moves_without_score_increase = 0
-       if moves_without_score_increase > 10:
+            break
+        if moves_without_score_increase > 10:
             print("Stuck")
             break
-       previous_score = game.score
+        previous_score = game.score
 
     # game.update_GUI()
     print(f"Score: {game.score}")
