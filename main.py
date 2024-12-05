@@ -253,13 +253,13 @@ def eval_genome(genome, config):
     game = Game(INIT_HEADLESS=True, INIT_TRAINING=True)
     moves_stuck = 0
     prev_score = 0
+    seen_states = list()
     while not game.game_over():
         inputs = game.flatten_board_to_list()
         output = net.activate(inputs)
-        # move = output.index(max(output))
-        output.sort()
-        for possible_move in output:
-            move = output.index(possible_move)
+
+        sorted_indices = sorted(range(len(output)), key=lambda i: output[i], reverse=True)
+        for move in sorted_indices:
             # Make a move
             if move == 0:
                 game.left(None)
@@ -269,25 +269,20 @@ def eval_genome(genome, config):
                 game.up(None)
             elif move == 3:
                 game.down(None)
-            if game.score > prev_score:
+        # Don't let the game get stuck
+            if game.score == prev_score:
+                moves_stuck += 1
+                genome.fitness -= 50
+            else:
+                moves_stuck = 0
                 genome.fitness += 100
-                prev_score = game.score
                 break
-            # genome.fitness -
-            # Don't let the game get stuck
-            # if game.score == prev_score:
-            #     moves_stuck += 1
-            #     genome.fitness -= 10
-            # else:
-            #     moves_stuck = 0
-            # if moves_stuck > 10:
-            #     genome.fitness -= 50
-            #     break
-        # Reward the genome for increasing the score
-        # if game.score > prev_score:
-        #     genome.fitness += 100
-        # prev_score = game.score
-    print(f"Highest Tile: {game.get_highest_tile()}")
+                
+        if moves_stuck > 10:
+            break
+
+
+        prev_score = game.score
     return genome.fitness
 
 def run_neat(config_file):
