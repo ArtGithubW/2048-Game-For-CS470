@@ -357,7 +357,7 @@ if __name__ == "__main__":
     if not TRAINING:
         Game()
     else:
-        config_file = "C:/Users/zak/OneDrive/Desktop/CS470/2048-Game-For-CS470/neat_config"
+        config_file = "./neat_config"
         winner = run_neat(config_file)
         # print(winner)
         play_with_winner(winner, config_file)
