@@ -1,4 +1,4 @@
-HEADLESS = True
+HEADLESS = False
 TRAINING = True
 
 GRID_COLOR = "#a39489"

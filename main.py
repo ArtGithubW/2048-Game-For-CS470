@@ -318,25 +318,25 @@ def play_with_winner(winner, config_file):
     previous_score = 0
     moves_without_score_increase = 0
     while not game.game_over():
-       inputs = game.flatten_board_to_list()
-       output = net.activate(inputs)
-       sorted_indices = sorted(range(len(output)), key=lambda i: output[i], reverse=True)
-       for move in sorted_indices:
-        if move == 0:
-             game.left(None)
-        elif move == 1:
-             game.right(None)
-        elif move == 2:
-             game.up(None)
-        elif move == 3:
-             game.down(None)
+        inputs = game.flatten_board_to_list()
+        output = net.activate(inputs)
+        sorted_indices = sorted(range(len(output)), key=lambda i: output[i], reverse=True)
+        for move in sorted_indices:
+            if move == 0:
+                game.left(None)
+            elif move == 1:
+                game.right(None)
+            elif move == 2:
+                game.up(None)
+            elif move == 3:
+                game.down(None)
         # game.update_GUI()
         # Don't get stuck
-        if game.score == previous_score:
-             moves_without_score_increase += 1
-        else:
-            moves_without_score_increase = 0
-            break
+            if game.score == previous_score:
+                moves_without_score_increase += 1
+            else:
+                moves_without_score_increase = 0
+                break
         if moves_without_score_increase > 10:
             print("Stuck")
             break
@@ -351,8 +351,12 @@ if __name__ == "__main__":
         Game()
     else:
         config_file = "./neat_config"
-        winner = run_neat(config_file)
+        # winner = run_neat(config_file)
         # Save winner
-        with open("winner.pkl", "wb") as f:
-            pickle.dump(winner, f)
+        # with open("winner.pkl", "wb") as f:
+        #     pickle.dump(winner, f)
+        
+        with open('winner.pkl', 'rb') as file: 
+            # Call load method to deserialze 
+            winner = pickle.load(file) 
         play_with_winner(winner, config_file)
